@@ -1,0 +1,15 @@
+# Docker compose file to startup a postgres:15 instance
+services:
+  postgres_db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ai_user
+      POSTGRES_PASSWORD: super_password
+      POSTGRES_DB: release_pipeline_db
+    ports:
+      - "5432:5432" #The port used to access the db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Physical DB location
+
+volumes:
+  postgres_data:
