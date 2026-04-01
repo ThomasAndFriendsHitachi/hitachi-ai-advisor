@@ -1,47 +1,72 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { useAuth } from '@/contexts/AuthContext'
+import { LoginPage } from '@/pages/LoginPage'
+import { Dashboard } from '@/pages/Dashboard'
 import './App.css'
 
-function App() {
-  const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    // TODO: Initialize app state, fetch initial data from API
-    setIsLoading(false)
-  }, [])
+// Protected Route Component
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth()
 
   if (isLoading) {
-    return <div className="app">Loading...</div>
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>
   }
 
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />
+  }
+
+  return <>{children}</>
+}
+
+// Root Route Handler - Redirects to appropriate page
+function RootRoute() {
+  const { isAuthenticated, isLoading } = useAuth()
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>
+  }
+
+  return <Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />
+}
+
+function AppRoutes() {
+  const { isAuthenticated, isLoading } = useAuth()
+
+  useEffect(() => {
+    console.log('[App] Route - isLoading:', isLoading, 'isAuthenticated:', isAuthenticated)
+  }, [isLoading, isAuthenticated])
+
   return (
-    <div className="app">
-      <header className="app-header">
-        <h1>Hitachi AI Advisor</h1>
-        <p>Manager Dashboard</p>
-      </header>
-      <main className="app-main">
-        <section className="intro">
-          <h2>Welcome to the AI Advisor Dashboard</h2>
-          <p>
-            This dashboard allows Hitachi managers to review, approve, and manage AI-generated suggestions.
-          </p>
-          <div className="feature-list">
-            <div className="feature-item">
-              <h3>📋 Review Suggestions</h3>
-              <p>View all AI-generated suggestions and their details</p>
-            </div>
-            <div className="feature-item">
-              <h3>✅ Approve Changes</h3>
-              <p>Approve or reject AI recommendations</p>
-            </div>
-            <div className="feature-item">
-              <h3>📊 Analytics</h3>
-              <p>Track approval rates and trends</p>
-            </div>
-          </div>
-        </section>
-      </main>
-    </div>
+    <Routes>
+      {/* Root path - redirects to login or dashboard based on auth */}
+      <Route path="/" element={<RootRoute />} />
+
+      {/* Login page - only accessible when not authenticated */}
+      <Route path="/login" element={!isAuthenticated ? <LoginPage /> : <Navigate to="/dashboard" replace />} />
+
+      {/* Dashboard - protected route */}
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Catch-all - redirect to root */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  )
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <AppRoutes />
+    </BrowserRouter>
   )
 }
 
