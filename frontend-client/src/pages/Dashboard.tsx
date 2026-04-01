@@ -231,7 +231,7 @@ export function Dashboard() {
 
         {/* Content Area */}
         <main className="flex-1 overflow-y-auto bg-background p-6">
-          <Card className="bg-card">
+          <Card>
             {/* Table Header */}
             <div className="px-6 py-4 border-b border-border">
               <h3 className="text-sm font-semibold text-card-foreground">
