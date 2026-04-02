@@ -1,17 +1,10 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Menu, Moon, Sun, Eye, EyeOff, LogOut, AlertCircle, Clock, CheckCircle, BarChart3, History, Settings, BookOpen } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAuth } from '@/contexts/AuthContext'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import {
   Table,
   TableBody,
@@ -68,7 +61,6 @@ const NAVIGATION = [
 ]
 
 export function Dashboard() {
-  const navigate = useNavigate()
   const { isDarkMode, toggleDarkMode } = useTheme()
   const { logout } = useAuth()
   const [isPrivacyMode, setIsPrivacyMode] = useState(false)
@@ -113,9 +105,9 @@ export function Dashboard() {
   }
 
   const handleLogout = () => {
-    console.log('[Dashboard] Logout initiated')
-    logout()
-    navigate('/login')
+    console.log('[Dashboard] Executing direct logout');
+    logout();
+    window.location.href = '/login';
   }
 
   return (
@@ -211,20 +203,16 @@ export function Dashboard() {
                 )}
               </button>
 
-              {/* Logout Menu */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm">
-                    <LogOut className="w-4 h-4 mr-2" />
-                    Logout
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleLogout}>
-                    Sign Out
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {/* Direct Logout Button */}
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleLogout}
+                className="text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Logout
+              </Button>
             </div>
           </div>
         </header>
