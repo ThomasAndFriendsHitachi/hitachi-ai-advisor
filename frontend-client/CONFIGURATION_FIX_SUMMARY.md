@@ -125,14 +125,14 @@ All three configurations are correct, so Tailwind CSS will render all utility cl
 ```tsx
 import { ShieldCheck } from 'lucide-react'
 
-<div className="w-14 h-14 bg-gradient-to-br from-slate-900 to-slate-700 rounded-xl flex items-center justify-center">
+<div className="w-14 h-14 bg-linear-to-br from-slate-900 to-slate-700 rounded-xl flex items-center justify-center">
   <ShieldCheck className="w-7 h-7 text-white" />
 </div>
 ```
 
 **What it does**:
 - `w-14 h-14` - 56px × 56px square
-- `bg-gradient-to-br from-slate-900 to-slate-700` - Dark gradient background
+- `bg-linear-to-br from-slate-900 to-slate-700` - Dark gradient background
 - `rounded-xl` - 12px border radius
 - `flex items-center justify-center` - Icon perfectly centered
 - `ShieldCheck` icon in white - Professional security indicator
@@ -155,15 +155,15 @@ import { ShieldCheck } from 'lucide-react'
 <Button
   onClick={handleSSOLogin}
   disabled={isLoading}
-  className="w-full bg-[#003366] hover:bg-[#004a7f] text-white font-semibold py-2.5 h-auto"
+  className="w-full bg-hitachi-blue hover:bg-hitachi-blue-light text-white font-semibold py-2.5 h-auto"
 >
   {isLoading ? 'Connecting...' : 'Sign In with Hitachi SSO'}
 </Button>
 ```
 
 **What it does**:
-- `bg-[#003366]` - Hitachi Blue primary color
-- `hover:bg-[#004a7f]` - Darker shade on hover
+- `bg-hitachi-blue` - Hitachi Blue primary color
+- `hover:bg-hitachi-blue-light` - Darker shade on hover
 - `text-white font-semibold` - Clear, readable text
 - `w-full` - Full button width
 - `py-2.5` - Comfortable vertical padding

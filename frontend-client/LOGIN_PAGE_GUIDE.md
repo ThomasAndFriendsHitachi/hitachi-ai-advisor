@@ -172,7 +172,7 @@ export function Header() {
 
 Replace `#003366` (Hitachi Blue) with your color:
 ```tsx
-<Button className="bg-[#003366] hover:bg-[#004a7f]">
+<Button className="bg-hitachi-blue hover:bg-hitachi-blue-light">
   // Change to your color
 </Button>
 ```

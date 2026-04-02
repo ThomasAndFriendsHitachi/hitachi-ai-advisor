@@ -196,7 +196,7 @@ max-width: 448px;    /* max-w-md */
 
 ### Logo Section
 ```tsx
-<motion.div className="w-16 h-16 bg-gradient-to-br from-[#003366] to-[#004a7f]">
+<motion.div className="w-16 h-16 bg-linear-to-br from-hitachi-blue to-hitachi-blue-light">
   <Shield className="w-8 h-8 text-white" />
 </motion.div>
 ```
@@ -207,7 +207,7 @@ max-width: 448px;    /* max-w-md */
 
 ### SSO Button
 ```tsx
-<Button className="w-full bg-gradient-to-r from-[#003366] to-[#004a7f]">
+<Button className="w-full bg-linear-to-r from-hitachi-blue to-hitachi-blue-light">
   <Shield className="w-4 h-4 mr-2" />
   Sign In with Hitachi SSO
 </Button>
