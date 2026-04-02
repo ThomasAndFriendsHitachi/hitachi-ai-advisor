@@ -1,29 +1,58 @@
-const express = require('express')
-const app = express()
-const port = 3000
+const express = require('express');
+const redis = require('redis');
+const { v4: uuidv4 } = require('uuid'); //Used to generate UUIDs
 
-app.use(express.json())
-app.get('/', (req, res) => {
-  res.send('Hello World!')
-})
+//Express configuration
+const app = express();
+//In case env var are configured
+const port = process.env.PORT || 3000;
 
-// Questa è la "porta" dove busserà GitHub
-app.post('/webhook', (req, res) => {
-  const payload = req.body
+//Redis configuration
+const redisUrl = process.env.REDIS_URL || 'redis://redis_broker:6379';
+const redisConnection = redis.createClient({ url: redisUrl });
+
+redisConnection.on('error', (err) => console.error('Error connecting to Redis:', err));
+
+(async () =>{
+  await redisConnection.connect();
+  console.log('Successfully connected to Redis.');
+})();
+
+app.use(express.json());
+
+//url to use in github action
+app.post('/webhook', async(req, res) => {
+  const payload = req.body;
+  const eventType = req.headers['x-github-event'];
 
   console.log('\n========================================')
-  console.log('🔔 NUOVO WEBHOOK RICEVUTO DA GITHUB!')
+  console.log(`NEW WEBHOOK: ${eventType}`)
   console.log('========================================')
   
-  // Usiamo JSON.stringify con "null, 2" per stampare il JSON nel terminale 
-  // bello formattato e impaginato, invece di una riga illeggibile.
+  //Prints the contents of webhook json
   console.log(JSON.stringify(payload, null, 2))
   console.log('========================================\n')
 
-  // Regola d'oro: rispondi SUBITO a GitHub con 200 OK
-  res.status(200).send('Webhook ricevuto forte e chiaro!')
+
+  try{
+    const envelope = JSON.stringify({
+      id: uuidv4(),
+      timestamp: new Date().toISOString(),
+      type: eventType,
+      source: "github_webhook",
+      payload: payload
+    });
+    //Add this message to te list ai_tasks
+    await redisConnection.lPush('queue:ai_tasks', envelope);
+    console.log("Added to redis queue");
+
+    res.status(202).send("Accepted and queued");
+  }catch(err){
+    console.error('Error sending to Redis...', err);
+    res.status(500).send('Internal Server Error');
+  }
 })
 
 app.listen(port, () => {
-  console.log(`webhook-receiver> Listening on port ${port}`)
+  console.log(`Listening on port ${port}`)
 })
