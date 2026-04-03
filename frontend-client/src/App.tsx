@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { LoginPage } from '@/pages/LoginPage'
 import { Dashboard } from '@/pages/Dashboard'
+import { CaseDetails } from './pages/CaseDetails'
 import './App.css'
 
 // Protected Route Component
@@ -52,6 +53,16 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Dashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* CaseDetails - protected route */}
+      <Route
+        path="/cases/:id"
+        element={
+          <ProtectedRoute>
+            <CaseDetails />
           </ProtectedRoute>
         }
       />

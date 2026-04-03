@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Menu, Moon, Sun, Eye, EyeOff, LogOut, AlertCircle, Clock, CheckCircle, BarChart3, History, Settings, BookOpen } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -63,6 +64,7 @@ const NAVIGATION = [
 export function Dashboard() {
   const { isDarkMode, toggleDarkMode } = useTheme()
   const { logout } = useAuth()
+  const navigate = useNavigate()
   const [isPrivacyMode, setIsPrivacyMode] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
 
@@ -101,7 +103,7 @@ export function Dashboard() {
 
   const handleCaseClick = (caseId: string) => {
     console.log('[Dashboard] Navigating to case:', caseId)
-    // TODO: Navigate to /cases/[id]
+    navigate(`/cases/${caseId}`)
   }
 
   const handleLogout = () => {
