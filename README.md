@@ -15,3 +15,7 @@ This project orchestrates the various microservices that power the AI Advisor. I
    ```bash
    git clone <repo-url>
    cd hitachi-ai-advisor
+
+1. **Launch the services:**
+   ```bash
+   docker compose up --build
