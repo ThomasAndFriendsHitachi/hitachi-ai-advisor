@@ -4,6 +4,10 @@ import { useAuth } from '@/contexts/AuthContext'
 import { LoginPage } from '@/pages/LoginPage'
 import { Dashboard } from '@/pages/Dashboard'
 import { CaseDetails } from './pages/CaseDetails'
+import { ReviewSuggestions } from './pages/ReviewSuggestions'
+import { Analytics } from './pages/Analytics'
+import { ProjectHistory } from './pages/ProjectHistory'
+import { Settings } from './pages/Settings'
 import './App.css'
 
 // Protected Route Component
@@ -67,6 +71,46 @@ function AppRoutes() {
         }
       />
 
+      {/* ReviewSuggestions - protected route */}
+      <Route
+        path="/review"
+        element={
+          <ProtectedRoute>
+            <ReviewSuggestions />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Analytics - protected route */}
+      <Route
+        path="/analytics"
+        element={
+          <ProtectedRoute>
+            <Analytics />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* ProjectHistory - protected route */}
+      <Route
+        path="/history"
+        element={
+          <ProtectedRoute>
+            <ProjectHistory />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Settings - protected route */}
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <Settings />
+          </ProtectedRoute>
+        }
+      />
+      
       {/* Catch-all - redirect to root */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
