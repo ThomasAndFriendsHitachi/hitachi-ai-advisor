@@ -35,10 +35,25 @@ services:
       - redis_broker
     environment:
       - REDIS_URL=redis://redis_broker:6379
+      - REDIS_QUEUE_NAME=queue:ai_tasks
       - PORT=3000
     networks:
       - advisor_net
 
+  # --- AI AGENT (MOCK) ---
+  agent:
+    build: ./agent
+    container_name: agent
+    restart: on-failure
+    depends_on:
+      - redis_broker
+    environment:
+      - REDIS_URL=redis://redis_broker:6379
+      - REDIS_QUEUE_NAME=queue:ai_tasks
+      - PYTHONUNBUFFERED=1
+    networks:
+      - advisor_net
+      
 volumes:
   postgres_data:
 
