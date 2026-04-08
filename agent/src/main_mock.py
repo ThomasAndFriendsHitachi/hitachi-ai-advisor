@@ -9,6 +9,7 @@ REDIS_QUEUE_NAME = os.environ.get('REDIS_QUEUE_NAME', 'queue:ai_tasks')
 
 try:
     r = redis.from_url(REDIS_URL, decode_responses = True)
+    r.ping()
     print(f"Connected to Redis on: {REDIS_URL}")
 except Exception as e:
     print(f"Error connecting to Redis: {e}")
