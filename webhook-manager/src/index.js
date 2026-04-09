@@ -10,7 +10,7 @@ const port = process.env.PORT || 3000;
 //Redis configuration
 const redisUrl = process.env.REDIS_URL || 'redis://redis_broker:6379';
 const redisConnection = redis.createClient({ url: redisUrl });
-
+const queue_name = process.env.REDIS_QUEUE_NAME || 'queue:ai_tasks'
 redisConnection.on('error', (err) => console.error('Error connecting to Redis:', err));
 
 (async () =>{
@@ -43,7 +43,7 @@ app.post('/webhook', async(req, res) => {
       payload: payload
     });
     //Add this message to te list ai_tasks
-    await redisConnection.lPush('queue:ai_tasks', envelope);
+    await redisConnection.lPush(queue_name, envelope);
     console.log("Added to redis queue");
 
     res.status(202).send("Accepted and queued");

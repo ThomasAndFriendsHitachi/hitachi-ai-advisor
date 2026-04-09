@@ -5,9 +5,9 @@ services:
     container_name: advisor_db
     restart: always
     environment:
-      POSTGRES_USER: ai_user
-      POSTGRES_PASSWORD: super_password
-      POSTGRES_DB: release_pipeline_db
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     ports:
       - "5432:5432"
     volumes:
@@ -20,7 +20,7 @@ services:
     image: redis:7-alpine
     container_name: advisor_redis
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT}:6379"
     networks:
       - advisor_net
 
@@ -34,11 +34,30 @@ services:
     depends_on:
       - redis_broker
     environment:
-      - REDIS_URL=redis://redis_broker:6379
+      - REDIS_URL=redis://${REDIS_HOST}:6379
+      - REDIS_QUEUE_NAME=${REDIS_QUEUE}
       - PORT=3000
     networks:
       - advisor_net
 
+  # --- AI AGENT (MOCK) ---
+  agent:
+    build: ./agent
+    container_name: agent
+    restart: on-failure
+    depends_on:
+      - redis_broker
+      - postgres_db
+    environment:
+      - REDIS_URL=redis://${REDIS_HOST}:6379
+      - REDIS_QUEUE_NAME=${REDIS_QUEUE}
+      - REDIS_CHANNEL_NAME=${REDIS_CHANNEL}
+      # connection string: postgresql://USER:PASSWORD@HOSTNAME:PORT/DB_NAME
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@postgres_db:5432/${DB_NAME}
+      - PYTHONUNBUFFERED=1
+    networks:
+      - advisor_net
+      
 volumes:
   postgres_data:
 
