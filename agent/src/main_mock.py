@@ -35,17 +35,12 @@ def worker():
                 print(f"Received: {data}")
                 with get_db_connection() as conn:
                     with conn.cursor() as cur:
-                        insert_query = "INSERT INTO ai_tasks_results (raw_payload) VALUES (%s);"
+                        insert_query = "INSERT INTO ai_tasks_results (raw_payload) VALUES (%s) RETURNING id;"
                         cur.execute(insert_query, (json.dumps(data),))
+                        new_id = cur.fetchone()[0]
                         conn.commit()
 
-                r.publish('task_updates', json.dumps(data))
-                new_id = cur.fetchone()[0]
-                conn.commit()
-                cur.close()
-                conn.close()
-
-                r.publish(REDIS_CHANNEL_NAME, json.dumps({"db_id": new_id, "status": "updated"}))
+                r.publish(REDIS_CHANNEL_NAME, json.dumps({"db_id": str(new_id), "status": "updated"}))
 
                 print(f"Task {new_id} complete.")
 
