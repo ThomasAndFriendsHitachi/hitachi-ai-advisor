@@ -8,6 +8,7 @@ from psycopg2.extras import RealDictCursor
 # Getting env vars, otherwise default to localhost and default list
 REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
 REDIS_QUEUE_NAME = os.environ.get('REDIS_QUEUE_NAME', 'queue:ai_tasks')
+REDIS_CHANNEL_NAME = os.environ.get('REDIS_CHANNEL_NAME', 'channel:task_updates')
 DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://user:password@localhost:5432/dbname')
 
 try:
@@ -38,6 +39,15 @@ def worker():
                         cur.execute(insert_query, (json.dumps(data),))
                         conn.commit()
 
+                r.publish('task_updates', json.dumps(data))
+                new_id = cur.fetchone()[0]
+                conn.commit()
+                cur.close()
+                conn.close()
+
+                r.publish(REDIS_CHANNEL_NAME, json.dumps({"db_id": new_id, "status": "updated"}))
+
+                print(f"Task {new_id} complete.")
 
         except Exception as e:
             print(f"Error reading: {e}")
