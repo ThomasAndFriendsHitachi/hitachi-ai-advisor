@@ -58,6 +58,24 @@ services:
       - PYTHONUNBUFFERED=1
     networks:
       - advisor_net
+
+  # --- BACKEND CLIENT ---
+  backend-client:
+    build: ./backend-client
+    container_name: backend_client
+    restart: on-failure
+    ports:
+      - "3001:3001" # Port for React to talk to
+    depends_on:
+      - redis_broker
+      - postgres_db
+    environment:
+      - REDIS_URL=redis://${REDIS_HOST}:6379
+      - REDIS_CHANNEL_NAME=${REDIS_CHANNEL}
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@postgres_db:5432/${DB_NAME}
+      - PORT=3001
+    networks:
+      - advisor_net
       
 volumes:
   postgres_data:
