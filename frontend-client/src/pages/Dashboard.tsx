@@ -1,15 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, AlertCircle, Clock, CheckCircle } from 'lucide-react'
 import { Card } from '@/components/ui/card'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AppLayout } from '@/components/layout/AppLayout'
 
 // Mock data for release cases
@@ -24,6 +17,42 @@ const MOCK_CASES = [
 export function Dashboard() {
   const navigate = useNavigate()
   const [isPrivacyMode, setIsPrivacyMode] = useState(false)
+  const [cases, setCases] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchCases = async () => {
+      const useMock = import.meta.env.VITE_USE_MOCK_DATA === 'true'
+      
+      if (useMock) {
+        setCases(MOCK_CASES)
+        setIsLoading(false)
+      } else {
+        try {
+          const response = await fetch(`${import.meta.env.VITE_API_URL}/api/cases`)
+          const dbCases = await response.json()
+          
+          // Map PostgreSQL ai_tasks_results to frontend table structure
+          const formattedCases = dbCases.map((dbCase: any) => ({
+            id: dbCase.id,
+            project: dbCase.raw_payload?.repository?.name || 'GitHub Webhook Event',
+            riskScore: 'Medium', // We will calculate this later based on AI agent output
+            status: dbCase.status,
+            date: dbCase.processed_at
+          }))
+          
+          setCases(formattedCases)
+        } catch (error) {
+          console.error("Failed to fetch real cases, falling back to mock data:", error)
+          setCases(MOCK_CASES) // Fallback if backend is down
+        } finally {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    fetchCases()
+  }, [])
 
   const getRiskColor = (risk: string) => {
     switch (risk) {
@@ -59,19 +88,13 @@ export function Dashboard() {
         
         {/* Table Controls (Title & Privacy Toggle) */}
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-foreground">
-            Release Cases Inbox
-          </h2>
+          <h2 className="text-2xl font-bold text-foreground">Release Cases Inbox</h2>
           <div 
             className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-border hover:bg-muted transition-colors cursor-pointer"
             onClick={() => setIsPrivacyMode(!isPrivacyMode)}
             title={isPrivacyMode ? 'Disable privacy mode' : 'Enable privacy mode'}
           >
-            {isPrivacyMode ? (
-              <EyeOff className="w-4 h-4 text-muted-foreground" />
-            ) : (
-              <Eye className="w-4 h-4 text-muted-foreground" />
-            )}
+            {isPrivacyMode ? <EyeOff className="w-4 h-4 text-muted-foreground" /> : <Eye className="w-4 h-4 text-muted-foreground" />}
             <span className="text-sm font-medium text-muted-foreground">Privacy Mode</span>
           </div>
         </div>
@@ -80,7 +103,7 @@ export function Dashboard() {
           {/* Table Header */}
           <div className="px-6 py-4 border-b border-border">
             <h3 className="text-sm font-semibold text-card-foreground">
-              Pending & Recent Approvals ({MOCK_CASES.length} items)
+              Pending & Recent Approvals ({cases.length} items)
             </h3>
           </div>
 
@@ -96,40 +119,42 @@ export function Dashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {MOCK_CASES.map((caseItem) => (
-                  <TableRow
-                    key={caseItem.id}
-                    onClick={() => handleCaseClick(caseItem.id)}
-                    className="cursor-pointer hover:bg-muted transition-colors border-b border-border"
-                  >
-                    <TableCell className="font-medium text-card-foreground">
-                      <span className={isPrivacyMode ? 'blur-sm select-none' : ''}>
-                        {maskProjectName(caseItem.project)}
-                      </span>
-                    </TableCell>
+                {isLoading ? (
+                  <TableRow><TableCell colSpan={4} className="text-center py-4">Loading cases...</TableCell></TableRow>
+                ) : cases.length === 0 ? (
+                  <TableRow><TableCell colSpan={4} className="text-center py-4 text-muted-foreground">No cases found in database.</TableCell></TableRow>
+                ) : (
+                  cases.map((caseItem) => (
+                    <TableRow key={caseItem.id} onClick={() => handleCaseClick(caseItem.id)} className="cursor-pointer hover:bg-muted">
+                      <TableCell className="font-medium text-card-foreground">
+                        <span className={isPrivacyMode ? 'blur-sm select-none' : ''}>
+                          {maskProjectName(caseItem.project)}
+                        </span>
+                      </TableCell>
 
-                    <TableCell>
-                      <div className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${getRiskColor(caseItem.riskScore)}`}>
-                        {getRiskIcon(caseItem.riskScore)}
-                        {caseItem.riskScore}
-                      </div>
-                    </TableCell>
+                      <TableCell>
+                        <div className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${getRiskColor(caseItem.riskScore)}`}>
+                          {getRiskIcon(caseItem.riskScore)}
+                          {caseItem.riskScore}
+                        </div>
+                      </TableCell>
 
-                    <TableCell>
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                        {caseItem.status}
-                      </span>
-                    </TableCell>
+                      <TableCell>
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                          {caseItem.status}
+                        </span>
+                      </TableCell>
 
-                    <TableCell className="text-right text-sm text-muted-foreground">
-                      {new Date(caseItem.date).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      <TableCell className="text-right text-sm text-muted-foreground">
+                        {new Date(caseItem.date).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
