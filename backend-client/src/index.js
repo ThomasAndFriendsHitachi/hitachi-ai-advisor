@@ -2,10 +2,20 @@ const express = require('express');
 const cors = require('cors');
 const redis = require('redis');
 const { Pool } = require('pg');
+const http = require('http');
+const { Server } = require('socket.io');
 
 const app = express();
-// Using 3001 so it doesn't clash with WebServer #1 on 3000
-const port = process.env.PORT || 3001; 
+const port = process.env.PORT || 3001;
+
+// Wrap Express with HTTP Server for Socket.io
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: {
+        origin: '*', // In production, restrict this to your frontend domain
+        methods: ['GET', 'POST']
+    }
+});
 
 app.use(cors());
 app.use(express.json());
@@ -19,7 +29,15 @@ pool.on('error', (err) => {
     console.error('Unexpected error on idle client', err);
 });
 
-// --- 2. Redis Subscriber ---
+// --- 2. WebSocket Connection Handling ---
+io.on('connection', (socket) => {
+    console.log(`[Socket.io] Client connected: ${socket.id}`);
+    socket.on('disconnect', () => {
+        console.log(`[Socket.io] Client disconnected: ${socket.id}`);
+    });
+});
+
+// --- 3. Redis Subscriber ---
 const redisUrl = process.env.REDIS_URL || 'redis://redis_broker:6379';
 const redisSubscriber = redis.createClient({ url: redisUrl });
 
@@ -34,14 +52,13 @@ redisSubscriber.on('error', (err) => console.error('Redis Error:', err));
     // Listen for the AI Agent publishing updates
     await redisSubscriber.subscribe(channelName, (message) => {
         console.log(`\n[REDIS Pub/Sub] Alert on ${channelName}:`, message);
-        // Note: For now we just log it. Later, we can use Socket.io here 
-        // to push this directly to the React frontend
+        
+        // Broadcast the update to all connected React clients!
+        io.emit('task_updated', JSON.parse(message));
     });
 })();
 
-// --- 3. REST API Endpoints ---
-
-// Get all AI tasks (Cases)
+// --- 4. REST API Endpoints ---
 app.get('/api/cases', async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM ai_tasks_results ORDER BY processed_at DESC');
@@ -69,22 +86,13 @@ app.get('/api/cases/:id', async (req, res) => {
 app.post('/api/auth/login', async (req, res) => {
     const { username, password } = req.body;
     try {
-        // Fetch user from DB
         const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
-        
         if (result.rows.length > 0) {
             const user = result.rows[0];
-            // Note: In production we would use bcrypt.compare() here.
-            // For now, if the user exists, we let them in.
             res.json({
                 success: true,
                 token: "mock-jwt-token-123",
-                user: {
-                    id: user.id,
-                    username: user.username,
-                    email: user.mail,
-                    name: user.username
-                }
+                user: { id: user.id, username: user.username, email: user.mail, name: user.username }
             });
         } else {
             res.status(401).json({ success: false, error: 'Invalid credentials' });
@@ -95,6 +103,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
-app.listen(port, () => {
-    console.log(`Backend API Server running on port ${port}`);
+// IMPORTANT: Use server.listen instead of app.listen
+server.listen(port, () => {
+    console.log(`Backend API & WebSocket Server running on port ${port}`);
 });
