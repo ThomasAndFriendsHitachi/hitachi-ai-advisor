@@ -5,7 +5,7 @@ Frontend microservice for the Hitachi AI Advisor platform. This React applicatio
 ## Architecture Context
 
 This microservice is part of a larger microservices architecture:
-- **Backend API**: WebServer #2 (Node.js + Express) at port 3000
+- **Backend Client**: WebServer #2 (Node.js + Express) at port 3000
 - **Database**: PostgreSQL connected to the backend
 - **AI Agent**: Worker node for generating suggestions
 - **Message Broker**: Redis for async communication
@@ -23,34 +23,6 @@ This frontend communicates exclusively with the **WebServer #2** via REST APIs t
 - **Vite** - Build tool and dev server
 - **Axios** - HTTP client
 - **ESLint** - Code linting
-
-## Project Structure
-
-```
-src/
-├── components/          # Reusable React components
-│   ├── common/         # Shared UI components (Header, Footer, etc.)
-│   └── features/       # Feature-specific components (Dashboard, etc.)
-├── config/
-│   ├── api.ts         # Axios instance and interceptors
-│   └── constants.ts   # App configuration and endpoints
-├── hooks/              # Custom React hooks
-│   └── useApi.ts      # Hook for API calls with state management
-├── pages/              # Page components (routes)
-├── types/              # TypeScript type definitions
-├── services/           # Business logic and API services
-├── styles/             # Global and shared CSS
-├── App.tsx            # Main App component
-├── App.css            # Main App styles
-└── main.tsx           # Entry point
-
-public/
-└── index.html         # HTML template
-
-Dockerfile            # Container configuration
-.env.example          # Example environment variables
-.eslintrc.cjs         # ESLint configuration
-```
 
 ## Getting Started
 
@@ -164,56 +136,6 @@ apiClient.get('/api/suggestions').then(res => {
   console.log(res.data)
 })
 ```
-
-## Best Practices
-
-1. **Type Safety**: Always define types for API responses in `src/types`
-2. **Environment Variables**: Use `VITE_*` prefix for environment variables (Vite's convention)
-3. **Component Organization**: Group related components in feature folders
-4. **Error Handling**: Use the global error interceptor in API config for consistent error handling
-5. **Code Quality**: Run linting before committing
-6. **Reusability**: Create custom hooks for common logic patterns
-7. **Comments**: Document complex components and utilities
-
-## Contributing
-
-When contributing to this microservice:
-
-1. Follow the existing folder structure
-2. Create feature branches for new changes
-3. Ensure TypeScript strict mode passes (`npm run type-check`)
-4. Run linting and fix any issues (`npm run lint`)
-5. Keep components focused and single-responsibility
-6. Add comments for complex business logic
-
-## TODO / Implementation Checklist
-
-- [ ] Define API endpoints in `src/config/constants.ts` based on backend implementation
-- [ ] Create TypeScript interfaces for API responses in `src/types/index.ts`
-- [ ] Implement page components in `src/pages/`
-- [ ] Create feature components in `src/components/features/`
-- [ ] Set up routing (add react-router-dom)
-- [ ] Implement authentication/authorization
-- [ ] Add state management if needed (Redux, Zustand, etc.)
-- [ ] Create API service functions in `src/services/`
-- [ ] Implement error boundaries
-- [ ] Add unit tests
-- [ ] Set up CI/CD pipeline
-
-## Microservice Communication
-
-```
-Frontend Client <--REST APIs--> WebServer #2 (Node.js + Express)
-                                 |
-                                 v
-                            PostgreSQL DB
-```
-
-The frontend only communicates with WebServer #2. All business logic and database queries are handled by the backend.
-
-## License
-
-ISC
 
 ## Related Microservices
 

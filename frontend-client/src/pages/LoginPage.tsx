@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { useAuth } from '@/contexts/AuthContext'
+import apiClient from '@/config/api'
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -40,49 +41,40 @@ export function LoginPage() {
     setIsLoading(true)
 
     try {
-      // Validate inputs
       if (!email || !password) {
         setError('Please enter both email and password')
         setIsLoading(false)
         return
       }
 
-      // Validate email format
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      if (!emailRegex.test(email)) {
-        setError('Please enter a valid email address')
-        setIsLoading(false)
-        return
+      const useMock = import.meta.env.VITE_USE_MOCK_DATA === 'true'
+
+      if (useMock) {
+        // --- MOCK MODE ---
+        await new Promise((resolve) => setTimeout(resolve, 800))
+        login({ id: '1', username: 'manager123', email: email, name: 'Manager User' })
+        navigate('/dashboard')
+      } else {
+        // --- REAL BACKEND MODE ---
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: email, password })
+        })
+        
+        const data = await response.json()
+        
+        if (data.success) {
+          login(data.user)
+          navigate('/dashboard')
+        } else {
+          setError(data.error || 'Invalid credentials')
+        }
       }
-
-      // TODO: Replace with actual API call to /api/auth/login
-      // const response = await fetch('/api/auth/login', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ email, password })
-      // })
-      // const data = await response.json()
-      // if (response.ok) {
-      //   localStorage.setItem('token', data.token)
-      //   login(data.user)
-      //   navigate('/dashboard')
-      // } else {
-      //   setError(data.message || 'Authentication failed')
-      // }
-
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 800))
-
-      // Mock user login
-      login({
-        id: '1',
-        username: 'manager123',
-        email: email,
-        name: 'Manager User',
-      })
-      navigate('/dashboard')
     } catch (err) {
-      setError('Authentication failed. Please try again.')
+      console.error(err)
+      setError('Authentication failed. Backend might be unreachable.')
+    } finally {
       setIsLoading(false)
     }
   }
