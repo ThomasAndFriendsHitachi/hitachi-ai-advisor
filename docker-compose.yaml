@@ -77,6 +77,21 @@ services:
     networks:
       - advisor_net
       
+# --- FRONTEND CLIENT ---
+  frontend-client:
+    build: ./frontend-client
+    container_name: frontend_client
+    restart: on-failure
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend-client
+    environment:
+      - VITE_API_URL=http://localhost:3001
+      - VITE_USE_MOCK_DATA=false # Toggle this to use mock data
+    networks:
+      - advisor_net
+    
 volumes:
   postgres_data:
 
