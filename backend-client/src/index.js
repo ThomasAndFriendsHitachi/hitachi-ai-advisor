@@ -7,8 +7,7 @@ const app = express();
 // Using 3001 so it doesn't clash with WebServer #1 on 3000
 const port = process.env.PORT || 3001; 
 
-// Middleware
-app.use(cors()); // Allows your React app to make requests
+app.use(cors());
 app.use(express.json());
 
 // --- 1. Database Connection ---
@@ -35,8 +34,8 @@ redisSubscriber.on('error', (err) => console.error('Redis Error:', err));
     // Listen for the AI Agent publishing updates
     await redisSubscriber.subscribe(channelName, (message) => {
         console.log(`\n[REDIS Pub/Sub] Alert on ${channelName}:`, message);
-        // Note: For now we just log it. Later, you can use Socket.io here 
-        // to push this directly to the React frontend!
+        // Note: For now we just log it. Later, we can use Socket.io here 
+        // to push this directly to the React frontend
     });
 })();
 
@@ -66,7 +65,7 @@ app.get('/api/cases/:id', async (req, res) => {
     }
 });
 
-// Basic Login Endpoint (Matches your init-db script)
+// Basic Login Endpoint
 app.post('/api/auth/login', async (req, res) => {
     const { username, password } = req.body;
     try {
@@ -75,7 +74,7 @@ app.post('/api/auth/login', async (req, res) => {
         
         if (result.rows.length > 0) {
             const user = result.rows[0];
-            // Note: In production you would use bcrypt.compare() here.
+            // Note: In production we would use bcrypt.compare() here.
             // For now, if the user exists, we let them in.
             res.json({
                 success: true,
