@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Eye, EyeOff, AlertCircle, Clock, CheckCircle } from 'lucide-react'
+import { io, Socket } from 'socket.io-client'
+import { Eye, EyeOff, AlertCircle, Clock, CheckCircle, Activity } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { toast } from 'sonner'
 
 // Mock data for release cases
 const MOCK_CASES = [
@@ -19,47 +21,76 @@ export function Dashboard() {
   const [isPrivacyMode, setIsPrivacyMode] = useState(false)
   const [cases, setCases] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isLive, setIsLive] = useState(false)
 
-  useEffect(() => {
-    const fetchCases = async () => {
-      const useMock = import.meta.env.VITE_USE_MOCK_DATA === 'true'
-      
-      if (useMock) {
-        setCases(MOCK_CASES)
-        setIsLoading(false)
-      } else {
-        try {
-          const response = await fetch(`${import.meta.env.VITE_API_URL}/api/cases`)
-          const dbCases = await response.json()
-          
-          // Map PostgreSQL ai_tasks_results to frontend table structure
-          const formattedCases = dbCases.map((dbCase: any) => ({
-            id: dbCase.id,
-            project: dbCase.raw_payload?.repository?.name || 'GitHub Webhook Event',
-            riskScore: 'Medium', // We will calculate this later based on AI agent output
-            status: dbCase.status,
-            date: dbCase.processed_at
-          }))
-          
-          setCases(formattedCases)
-        } catch (error) {
-          console.error("Failed to fetch real cases, falling back to mock data:", error)
-          setCases(MOCK_CASES) // Fallback if backend is down
-        } finally {
-          setIsLoading(false)
-        }
-      }
+  // Wrapped in useCallback so we can safely use it inside the socket listener
+  const fetchCases = useCallback(async (isSilentUpdate = false) => {
+    const useMock = import.meta.env.VITE_USE_MOCK_DATA === 'true'
+    
+    if (useMock) {
+      setCases(MOCK_CASES)
+      setIsLoading(false)
+      return
     }
 
-    fetchCases()
+    try {
+      // Only show the hard loading state if it's the initial fetch
+      if (!isSilentUpdate) setIsLoading(true)
+      
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/cases`)
+      const dbCases = await response.json()
+      
+      // Map PostgreSQL ai_tasks_results to frontend table structure
+      const formattedCases = dbCases.map((dbCase: any) => ({
+        id: dbCase.id,
+        project: dbCase.raw_payload?.repository?.name || 'GitHub Webhook Event',
+        riskScore: 'Medium', // We will calculate this later based on AI agent output
+        status: dbCase.status === 'received' ? 'Pending Review' : dbCase.status,
+        date: dbCase.processed_at
+      }))
+      
+      setCases(formattedCases)
+    } catch (error) {
+      console.error("Failed to fetch real cases, falling back to mock data:", error)
+      setCases(MOCK_CASES) // Fallback if backend is down
+    } finally {
+      setIsLoading(false)
+    }
   }, [])
+
+  useEffect(() => {
+    // 1. Fetch initial data
+    fetchCases()
+
+    // 2. Connect to WebSocket Server (WebServer #2)
+    const socketUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    const socket: Socket = io(socketUrl)
+
+    socket.on('connect', () => setIsLive(true))
+    socket.on('disconnect', () => setIsLive(false))
+
+    // 3. Listen for AI Agent completing a task via Redis Pub/Sub
+    socket.on('task_updated', (data) => {
+      // Refresh the table quietly (no hard loading screen)
+      fetchCases(true)
+      
+      // Pop a Sonner toast notification
+      toast.info("New AI Analysis Complete", {
+        description: `Task ${String(data.db_id).slice(0,8)}... has been processed and added to your inbox.`,
+      })
+    })
+
+    return () => {
+      socket.disconnect()
+    }
+  }, [fetchCases])
 
   const getRiskColor = (risk: string) => {
     switch (risk) {
-      case 'High': return 'text-red-600 bg-red-50'
-      case 'Medium': return 'text-amber-600 bg-amber-50'
-      case 'Low': return 'text-green-600 bg-green-50'
-      default: return 'text-gray-600 bg-gray-50'
+      case 'High': return 'text-red-600 bg-red-50 dark:bg-red-900/30 dark:text-red-400'
+      case 'Medium': return 'text-amber-600 bg-amber-50 dark:bg-amber-900/30 dark:text-amber-400'
+      case 'Low': return 'text-green-600 bg-green-50 dark:bg-green-900/30 dark:text-green-400'
+      default: return 'text-gray-600 bg-gray-50 dark:bg-gray-800 dark:text-gray-300'
     }
   }
 
@@ -88,7 +119,16 @@ export function Dashboard() {
         
         {/* Table Controls (Title & Privacy Toggle) */}
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-foreground">Release Cases Inbox</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl font-bold text-foreground">Release Cases Inbox</h2>
+            
+            {/* Live Connection Badge */}
+            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${isLive ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800/50' : 'bg-muted text-muted-foreground border-border'}`}>
+              <Activity className={`w-3 h-3 ${isLive ? 'animate-pulse' : ''}`} />
+              {isLive ? 'Live Sync' : 'Offline'}
+            </div>
+          </div>
+
           <div 
             className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-border hover:bg-muted transition-colors cursor-pointer"
             onClick={() => setIsPrivacyMode(!isPrivacyMode)}
@@ -120,12 +160,16 @@ export function Dashboard() {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={4} className="text-center py-4">Loading cases...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">Loading cases...</TableCell></TableRow>
                 ) : cases.length === 0 ? (
-                  <TableRow><TableCell colSpan={4} className="text-center py-4 text-muted-foreground">No cases found in database.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No cases found in database. Waiting for webhooks...</TableCell></TableRow>
                 ) : (
                   cases.map((caseItem) => (
-                    <TableRow key={caseItem.id} onClick={() => handleCaseClick(caseItem.id)} className="cursor-pointer hover:bg-muted">
+                    <TableRow 
+                      key={caseItem.id} 
+                      onClick={() => handleCaseClick(caseItem.id)} 
+                      className="cursor-pointer hover:bg-muted transition-colors border-b border-border"
+                    >
                       <TableCell className="font-medium text-card-foreground">
                         <span className={isPrivacyMode ? 'blur-sm select-none' : ''}>
                           {maskProjectName(caseItem.project)}
@@ -140,7 +184,7 @@ export function Dashboard() {
                       </TableCell>
 
                       <TableCell>
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${caseItem.status === 'Pending Review' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-primary/10 text-primary'}`}>
                           {caseItem.status}
                         </span>
                       </TableCell>
@@ -149,7 +193,8 @@ export function Dashboard() {
                         {new Date(caseItem.date).toLocaleDateString('en-US', {
                           month: 'short',
                           day: 'numeric',
-                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
                         })}
                       </TableCell>
                     </TableRow>
