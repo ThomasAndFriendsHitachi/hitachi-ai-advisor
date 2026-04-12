@@ -1,13 +1,13 @@
-# Build stage
-FROM node:18-alpine AS builder
+# Build stage (Using standard node to fix native binding errors)
+FROM node:20-slim AS builder
 
 WORKDIR /app
 
-# Copy package files
-COPY package.json package-lock.json* yarn.lock* ./
+# Only copy package.json (intentionally dropping the lockfile to bypass the npm bug)
+COPY package.json ./
 
-# Install dependencies
-RUN npm ci || npm install
+# Install dependencies freshly
+RUN npm install
 
 # Copy source code
 COPY . .
@@ -15,8 +15,8 @@ COPY . .
 # Build application
 RUN npm run build
 
-# Production stage
-FROM node:18-alpine
+# Production stage (Using Alpine here is fine since it just serves static files)
+FROM node:20-alpine
 
 WORKDIR /app
 
