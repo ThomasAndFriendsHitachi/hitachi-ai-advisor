@@ -33,6 +33,7 @@ export function Dashboard() {
   const [isLive, setIsLive] = useState(false)
 
   const fetchCases = useCallback(async (isSilentUpdate = false) => {
+    console.log("DEBUG: Sto chiamando l'URL:", `${import.meta.env.VITE_API_URL}/api/cases`);
     const useMock = import.meta.env.VITE_USE_MOCK_DATA === 'true'
     
     if (useMock) {
@@ -45,7 +46,8 @@ export function Dashboard() {
       if (!isSilentUpdate) setIsLoading(true)
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/cases`)
       const dbCases = await response.json()
-      
+      console.log("Dati ricevuti dal DB:", dbCases)
+
       const formattedCases = dbCases.map((dbCase: any) => ({
         id: dbCase.id,
         project: dbCase.project_name || 'Unknown Project',
