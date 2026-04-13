@@ -189,7 +189,14 @@ export function Dashboard() {
                 <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto md:mx-0">
                   The AI Agent has processed new incoming release candidates from GitHub. Review the suggestions to unblock the pipeline.
                 </p>
-                <Button className="px-8" onClick={() => navigate('/cases/1')}>
+                <Button 
+                  className="px-8" 
+                  onClick={() => {
+                    // Navigate to the first pending case if it exists, otherwise just case 1
+                    const targetId = cases.length > 0 ? cases[0].id : '1'
+                    navigate(`/cases/${targetId}`)
+                  }}
+                >
                   Start Reviews
                 </Button>
               </div>
