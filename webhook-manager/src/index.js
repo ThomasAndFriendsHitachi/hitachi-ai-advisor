@@ -25,33 +25,31 @@ app.post('/webhook', async(req, res) => {
   const payload = req.body;
   const eventType = req.headers['x-github-event'];
 
-  console.log('\n========================================')
-  console.log(`NEW WEBHOOK: ${eventType}`)
-  console.log('========================================')
-  
-  //Prints the contents of webhook json
-  console.log(JSON.stringify(payload, null, 2))
-  console.log('========================================\n')
+  // Logic to determine the project name from the GitHub payload
+  const projectName = payload.project_name || (payload.repository ? payload.repository.full_name : "Manual Trigger");
 
-
-  try{
+  try {
     const envelope = JSON.stringify({
       id: uuidv4(),
       timestamp: new Date().toISOString(),
       type: eventType,
       source: "github_webhook",
-      payload: payload
+      payload: {
+          ...payload,
+          project_name: projectName // Ensure the worker finds this key easily
+      }
     });
-    //Add this message to te list ai_tasks
-    await redisConnection.lPush(queue_name, envelope);
-    console.log("Added to redis queue");
 
-    res.status(202).send("Accepted and queued");
-  }catch(err){
-    console.error('Error sending to Redis...', err);
+    // Push the structured envelope to Redis
+    await redisConnection.lPush(queue_name, envelope);
+    console.log(`Queued: ${projectName}`);
+
+    res.status(202).json({ message: "Accepted", project: projectName });
+  } catch(err) {
+    console.error('Redis Push Error:', err);
     res.status(500).send('Internal Server Error');
   }
-})
+});
 
 app.listen(port, () => {
   console.log(`Listening on port ${port}`)

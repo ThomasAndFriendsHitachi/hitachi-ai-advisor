@@ -13,12 +13,14 @@ CREATE TABLE IF NOT EXISTS public.users (
 );
 
 -- 3. Create the AI Tasks results table
--- Linking incoming payloads from webhooks to their processing status
+-- Added project_name and risk_score columns to match Dashboard requirements
 CREATE TABLE IF NOT EXISTS public.ai_tasks_results (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    raw_payload JSONB NOT NULL,
-    processed_at TIMESTAMP DEFAULT NOW(),
-    status VARCHAR(50) DEFAULT 'received'
+    project_name VARCHAR(255),        -- Extracted from GitHub repository name
+    risk_score VARCHAR(50),          -- Mocked or calculated risk level (High, Medium, Low)
+    status VARCHAR(50) DEFAULT 'received', -- Current processing state
+    raw_payload JSONB NOT NULL,       -- Full JSON data for audit/history
+    processed_at TIMESTAMP DEFAULT NOW()
 );
 
 -- 4. Seed the database with a default Admin user
@@ -35,4 +37,4 @@ ON CONFLICT (username) DO NOTHING;
 
 -- Documentation comments for the database
 COMMENT ON TABLE public.users IS 'Stores user credentials and roles for system access';
-COMMENT ON TABLE public.ai_tasks_results IS 'Log of AI agent processing tasks and results';
+COMMENT ON TABLE public.ai_tasks_results IS 'Stores AI analysis results, project metadata, and webhook payloads';
