@@ -57,7 +57,7 @@ export function Dashboard() {
       setCases(formattedCases)
     } catch (error) {
       console.error("Failed to fetch real cases:", error)
-      setCases(MOCK_CASES) 
+      setCases([])
     } finally {
       setIsLoading(false)
     }
