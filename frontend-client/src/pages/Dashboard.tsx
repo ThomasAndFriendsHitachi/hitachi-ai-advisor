@@ -48,16 +48,17 @@ export function Dashboard() {
       
       const formattedCases = dbCases.map((dbCase: any) => ({
         id: dbCase.id,
-        project: dbCase.raw_payload?.repository?.name || 'Automated Webhook Event',
-        riskScore: ['High', 'Medium', 'Low'][Math.floor(Math.random() * 3)],
-        status: dbCase.status === 'received' ? 'Pending Review' : dbCase.status,
+        project: dbCase.project_name || 'Unknown Project',
+        riskScore: dbCase.risk_score || 'Medium',
+        status: dbCase.status || 'received',
         date: dbCase.processed_at
       }))
       
       setCases(formattedCases)
     } catch (error) {
       console.error("Failed to fetch real cases:", error)
-      setCases([])
+      // If the API fails, we show an empty state instead of confusing mock data
+      setCases([]) 
     } finally {
       setIsLoading(false)
     }
