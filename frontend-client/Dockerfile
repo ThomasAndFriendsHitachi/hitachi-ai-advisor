@@ -1,29 +1,43 @@
 # Build stage
-FROM node:18-alpine AS builder
+FROM node:20-slim AS builder
 
 WORKDIR /app
 
-# Copy package files
-COPY package.json package-lock.json* yarn.lock* ./
+# --- ARGUMENTS INJECTION ---
+# These must match the names in your docker-compose 'args' section
+ARG VITE_API_URL
+ARG VITE_USE_MOCK_DATA
+ARG VITE_APP_TITLE
+
+# Set them as ENV variables so 'npm run build' can see them
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_USE_MOCK_DATA=$VITE_USE_MOCK_DATA
+ENV VITE_APP_TITLE=$VITE_APP_TITLE
+
+# Copy package.json
+COPY package.json ./
 
 # Install dependencies
-RUN npm ci || npm install
+RUN npm install --omit=optional
 
-# Copy source code
+# Install Rollup native binaries
+RUN npm install @rollup/rollup-linux-x64-gnu @rollup/rollup-linux-arm64-gnu -O
+
+# Copy the rest of the source code
 COPY . .
 
-# Build application
+# Build the application (Vite will now bake the ENV vars into the JS files)
 RUN npm run build
 
 # Production stage
-FROM node:18-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 
-# Install serve to run the application
+# Install serve
 RUN npm install -g serve
 
-# Copy built application from builder
+# Copy built application
 COPY --from=builder /app/dist ./dist
 
 # Expose port

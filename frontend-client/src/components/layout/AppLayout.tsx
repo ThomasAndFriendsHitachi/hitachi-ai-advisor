@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAuth } from '@/contexts/AuthContext'
+import { Toaster } from "@/components/ui/sonner"
 
 const NAVIGATION = [
   { label: 'Review Suggestions', href: '/review', icon: AlertCircle },
@@ -103,6 +104,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           {children}
         </div>
       </div>
+      <Toaster position="bottom-right" richColors />
     </div>
   )
 }

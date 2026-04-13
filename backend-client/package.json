@@ -1,0 +1,17 @@
+{
+  "name": "backend-client",
+  "version": "1.0.0",
+  "description": "REST API server for frontend-client",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node src/index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "pg": "^8.11.5",
+    "redis": "^4.6.13",
+    "socket.io": "^4.8.3"
+  }
+}
