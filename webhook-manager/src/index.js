@@ -39,7 +39,7 @@ app.post('/webhook', async(req, res) => {
           project_name: projectName // Ensure the worker finds this key easily
       }
     });
-
+    console.log(envelope)
     // Push the structured envelope to Redis
     await redisConnection.lPush(queue_name, envelope);
     console.log(`Queued: ${projectName}`);
