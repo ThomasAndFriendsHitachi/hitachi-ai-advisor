@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, FileText, Shield, BookOpen, Clock, Mail, CheckCircle2, XCircle, Loader2, GitCommit, Github } from 'lucide-react'
+import { ArrowLeft, FileText, Shield, BookOpen, Clock, Mail, CheckCircle2, XCircle, Loader2, GitCommit, GitBranch } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -120,7 +120,7 @@ export function CaseDetails() {
             <div className="space-y-6 overflow-y-auto pr-2 pb-6">
               
               <section>
-                <h2 className="text-lg font-semibold flex items-center mb-4 text-foreground"><Github className="w-5 h-5 mr-2 text-muted-foreground" />GitHub Context</h2>
+                <h2 className="text-lg font-semibold flex items-center mb-4 text-foreground"><GitBranch className="w-5 h-5 mr-2 text-muted-foreground" />GitHub Context</h2>
                 <Card className="p-5 space-y-4 border-border shadow-sm">
                   <div>
                     <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider mb-1">Repository</p>
