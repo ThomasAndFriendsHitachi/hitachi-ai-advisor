@@ -13,7 +13,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
         origin: '*', // In production, restrict this to your frontend domain
-        methods: ['GET', 'POST']
+        methods: ['GET', 'POST', 'PUT'] // Make sure PUT is allowed for the new route
     }
 });
 
@@ -79,6 +79,69 @@ app.get('/api/cases/:id', async (req, res) => {
     } catch (err) {
         console.error('DB Error:', err);
         res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Update Case Status and Trigger GitHub Pipeline
+app.put('/api/cases/:id/status', async (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body; // Expects 'Approved' or 'Rejected'
+
+    try {
+        // 1. Update DB and get the raw_payload back
+        const updateQuery = `
+            UPDATE ai_tasks_results 
+            SET status = $1 
+            WHERE id = $2 
+            RETURNING raw_payload;
+        `;
+        const result = await pool.query(updateQuery, [status, id]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Case not found' });
+        }
+
+        const payload = result.rows[0].raw_payload;
+
+        // 2. Extract repository and commit SHA from the GitHub payload safely
+        // Different GitHub events (push, pull_request) store these in slightly different places
+        const owner = payload.repository?.owner?.login || payload.repository?.owner?.name;
+        const repo = payload.repository?.name;
+        const sha = payload.pull_request?.head?.sha || payload.after || payload.head_commit?.id;
+
+        if (owner && repo && sha) {
+            // 3. Map our UI status to GitHub's required pipeline states
+            const githubState = status === 'Approved' ? 'success' : 'failure';
+            const description = status === 'Approved' ? 'Release approved by Hitachi Manager' : 'Release rejected by Hitachi Manager';
+
+            // 4. Send the command to Webserver 1 (Webhook Manager)
+            // In Docker, 'webhook-manager' is the host name of the container
+            const ws1Url = process.env.WS1_URL || 'http://webhook-manager:3000';
+            
+            // Fire and forget (don't await) so the React UI responds instantly
+            fetch(`${ws1Url}/update-github-status`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ owner, repo, sha, state: githubState, description })
+            })
+            .then(ws1Response => {
+                if (!ws1Response.ok) {
+                    console.error(`Warning: WS1 returned status ${ws1Response.status}`);
+                } else {
+                    console.log(`[WS2 -> WS1] Forwarded GitHub status update for ${sha}`);
+                }
+            })
+            .catch(err => console.error("Failed to reach WS1:", err));
+            
+        } else {
+            console.warn("Could not extract owner, repo, or sha from payload. Skipping GitHub update.");
+        }
+
+        res.json({ message: 'Status updated successfully', status });
+
+    } catch (err) {
+        console.error('Error updating status:', err);
+        res.status(500).json({ error: 'Failed to update status' });
     }
 });
 
