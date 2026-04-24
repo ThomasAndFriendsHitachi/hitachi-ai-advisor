@@ -38,6 +38,7 @@ services:
       - REDIS_URL=redis://${REDIS_HOST}:6379
       - REDIS_QUEUE_NAME=${REDIS_QUEUE}
       - PORT=3000
+      - WEBHOOK_REPO_TOKEN=${WEBHOOK_REPO_TOKEN}
     networks:
       - advisor_net
 
