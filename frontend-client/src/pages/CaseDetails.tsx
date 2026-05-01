@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { DecisionJournalPreview } from '@/components/features/DecisionJournalPreview'
 import { toast } from "sonner"
 
 export function CaseDetails() {
@@ -163,6 +164,12 @@ export function CaseDetails() {
                     <p className="text-sm text-muted-foreground">Automated payload validation passed. Awaiting human oversight to release pipeline lock.</p>
                   </Card>
                 </div>
+              </section>
+
+              <Separator className="bg-border" />
+
+              <section>
+                <DecisionJournalPreview />
               </section>
             </div>
 

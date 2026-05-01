@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Menu, Moon, Sun, BookOpen, AlertCircle, BarChart3, History, Settings } from 'lucide-react'
+import { Menu, Moon, Sun, BookOpen, AlertCircle, BarChart3, History, Settings, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Toaster } from "@/components/ui/sonner"
 
 const NAVIGATION = [
+  { label: 'Decision Journal', href: '/decision-journal', icon: FileText },
   { label: 'Review Suggestions', href: '/review', icon: AlertCircle },
   { label: 'Analytics', href: '/analytics', icon: BarChart3 },
   { label: 'Project History', href: '/history', icon: History },

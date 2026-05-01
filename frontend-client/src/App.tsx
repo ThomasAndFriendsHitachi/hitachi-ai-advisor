@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { LoginPage } from '@/pages/LoginPage'
 import { Dashboard } from '@/pages/Dashboard'
 import { CaseDetails } from './pages/CaseDetails'
+import { DecisionJournal } from './pages/DecisionJournal'
 import { ReviewSuggestions } from './pages/ReviewSuggestions'
 import { Analytics } from './pages/Analytics'
 import { ProjectHistory } from './pages/ProjectHistory'
@@ -67,6 +68,16 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <CaseDetails />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* DecisionJournal - protected route */}
+      <Route
+        path="/decision-journal"
+        element={
+          <ProtectedRoute>
+            <DecisionJournal />
           </ProtectedRoute>
         }
       />
