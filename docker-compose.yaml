@@ -41,6 +41,26 @@ services:
     networks:
       - advisor_net
 
+  # --- INGESTOR WORKER ---
+  ingestor:
+    build: ./Ingestor
+    container_name: ingestor_worker
+    profiles: ["ingestor"]
+    restart: on-failure
+    depends_on:
+      - redis_broker
+    environment:
+      - REDIS_URL=redis://${REDIS_HOST}:6379
+      - INGESTOR_INPUT_QUEUE=${REDIS_QUEUE}
+      - INGESTOR_OUTPUT_QUEUE=queue:ingestor_results
+      - INGESTOR_DLQ_QUEUE=queue:ingestor_dlq
+      - INGESTOR_MAX_RETRIES=3
+      - INGESTOR_POP_TIMEOUT=5
+      - INGESTOR_RECOVER_INFLIGHT=true
+      - PYTHONUNBUFFERED=1
+    networks:
+      - advisor_net
+
   # --- AI AGENT (MOCK) ---
   agent:
     build: ./agent

@@ -54,6 +54,11 @@ def test_ingestor_main_function(monkeypatch: pytest.MonkeyPatch) -> None:
     assert Ingestor.main(["--input", "x", "--output", "y"]) == 7
 
 
+def test_ingestor_main_worker_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("Ingestor.run_worker_from_env", lambda argv=None: 9)
+    assert Ingestor.main(["--worker", "--max-jobs", "1"]) == 9
+
+
 def test_entrypoint_dunder_main_blocks(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("ingestor_core.cli.CliApp.run", lambda self, argv=None: 0)
     with pytest.raises(SystemExit) as ex1:

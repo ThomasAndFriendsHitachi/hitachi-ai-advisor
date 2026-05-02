@@ -5,6 +5,7 @@ pdfplumber>=0.11.0
 pandas>=2.2.0
 openpyxl>=3.1.0
 xlrd>=2.0.1
+redis>=5.0.0
 
 # Legacy .doc extraction on Windows (uses Microsoft Word COM automation)
 pywin32>=306; platform_system == "Windows"
