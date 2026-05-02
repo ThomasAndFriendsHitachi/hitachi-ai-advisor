@@ -25,6 +25,21 @@ services:
     networks:
       - advisor_net
 
+  # --- LOCAL STORAGE MANAGER (MinIO)
+  # docker-compose.yml
+  minio:
+    image: minio/minio
+    container_name: minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    command: server /data --console-address ":9001"
+    networks:
+      - advisor_net
+
   # --- WEBHOOK MANAGER ---
   webhook-manager:
     build: ./webhook-manager
@@ -34,11 +49,17 @@ services:
       - "3000:3000" #Webhooks incoming from gh
     depends_on:
       - redis_broker
+      - minio
     environment:
       - REDIS_URL=redis://${REDIS_HOST}:6379
       - REDIS_QUEUE_NAME=${REDIS_QUEUE}
       - PORT=3000
       - WEBHOOK_REPO_TOKEN=${WEBHOOK_REPO_TOKEN}
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
+      - MINIO_BUCKET_NAME=hitachi-ingestion
     networks:
       - advisor_net
 

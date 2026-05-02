@@ -1,90 +1,178 @@
 const express = require('express');
 const redis = require('redis');
-const { v4: uuidv4 } = require('uuid'); //Used to generate UUIDs
-const crypto = require('crypto');
+const { v4: uuidv4 } = require('uuid');
+const path = require('path');
+const { S3Client, PutObjectCommand, CreateBucketCommand, HeadBucketCommand } = require("@aws-sdk/client-s3");
 
-//Express configuration
+// Express configuration
 const app = express();
-//In case env var are configured
 const port = process.env.PORT || 3000;
 
+// Token secrets
 const WEBHOOK_SECRET = process.env.GITHUB_WEBHOOK_SECRET || 'my-secret';
+const GITHUB_TOKEN = process.env.WEBHOOK_REPO_TOKEN; 
 
-//Redis configuration
+// --- S3 / MinIO Configuration ---
+const BUCKET_NAME = process.env.MINIO_BUCKET_NAME || 'hitachi-ingestion';
+const s3Client = new S3Client({
+  region: "us-east-1", // MinIO default
+  endpoint: process.env.MINIO_ENDPOINT || "http://minio:9000",
+  forcePathStyle: true, // Mandatory for MinIO to work properly instead of AWS
+  credentials: {
+    accessKeyId: process.env.MINIO_ACCESS_KEY || "admin",
+    secretAccessKey: process.env.MINIO_SECRET_KEY || "SuperSecretMinio123!"
+  }
+});
+
+// --- Redis configuration ---
 const redisUrl = process.env.REDIS_URL || 'redis://redis_broker:6379';
 const redisConnection = redis.createClient({ url: redisUrl });
-const queue_name = process.env.REDIS_QUEUE_NAME || 'queue:ai_tasks'
+
 redisConnection.on('error', (err) => console.error('Error connecting to Redis:', err));
 
-(async () =>{
-  await redisConnection.connect();
-  console.log('Successfully connected to Redis.');
-})();
-
-app.use(express.json({
-  verify: (req, res, buf) => {
-    req.rawBody = buf;
-  }
-}));
-
-// Helper function to verify github signature
-function verifyGitHubSignature(req) {
-  const signature = req.headers['x-hub-signature-256'];
-  if (!signature) return false;
-
-  const hmac = crypto.createHmac('sha256', WEBHOOK_SECRET);
-  const digest = 'sha256=' + hmac.update(req.rawBody).digest('hex');
-
+// Ensure the MinIO bucket exists on startup
+async function initBucket() {
   try {
-    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest));
-  } catch (e) {
-    return false;
+    await s3Client.send(new HeadBucketCommand({ Bucket: BUCKET_NAME }));
+    console.log(`MinIO Bucket '${BUCKET_NAME}' found.`);
+  } catch (err) {
+    if (err.name === 'NotFound' || err.$metadata?.httpStatusCode === 404) {
+      console.log(`Creating MinIO Bucket '${BUCKET_NAME}'...`);
+      await s3Client.send(new CreateBucketCommand({ Bucket: BUCKET_NAME }));
+      console.log('Bucket created successfully!');
+    } else {
+      console.error("Error checking MinIO bucket (might be starting up):", err.message);
+    }
   }
 }
 
-//url to use in github action
-app.post('/webhook', async(req, res) => {
+(async () => {
+  await redisConnection.connect();
+  console.log('Successfully connected to Redis.');
+  await initBucket();
+})();
 
-  if (!verifyGitHubSignature(req)){
-    console.warn("Received webhook with invalid of missing signature");
+app.use(express.json());
+
+// --- Extensions and Filters ---
+const SUPPORTED_EXTENSIONS = new Set([
+  '.txt', '.md', '.rst', '.log', '.ini', '.cfg', '.conf', '.yaml', '.yml',
+  '.xml', '.html', '.htm', '.sql', '.sh', '.bash', '.zsh', '.bat', '.cmd', '.ps1',
+  '.py', '.js', '.ts', '.java', '.c', '.cpp', '.cs', '.go', '.rb', '.php',
+  '.docx', '.doc', '.pdf', '.csv', '.xls', '.xlsx', '.json'
+]);
+
+function isSupportedFile(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  if (!ext) return true; // Files without an extension (e.g., Dockerfile, Makefile) are accepted
+  return SUPPORTED_EXTENSIONS.has(ext);
+}
+
+// --- Helper: Download from GitHub and upload to MinIO ---
+async function processAndUploadFile(repoFullName, commitSha, originalFilePath, objectKey) {
+  const url = `https://raw.githubusercontent.com/${repoFullName}/${commitSha}/${originalFilePath}`;
+  
+  const response = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${GITHUB_TOKEN}`,
+      'Accept': 'application/vnd.github.v3.raw'
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ${originalFilePath}: ${response.statusText}`);
+  }
+
+  // Read as a binary array to support large files and Office/PDF documents without corruption
+  const arrayBuffer = await response.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+  
+  // Upload to MinIO
+  await s3Client.send(new PutObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: objectKey,
+    Body: buffer
+  }));
+}
+
+// --- WEBHOOK ENDPOINT (Custom Action via cURL) ---
+app.post('/webhook', async (req, res) => {
+  
+  // Validation via Bearer Token sent by your GitHub Action
+  const authHeader = req.headers['authorization'];
+  if (!authHeader || authHeader !== `Bearer ${WEBHOOK_SECRET}`) {
+    console.warn("Received webhook with invalid or missing Bearer token");
     return res.status(401).send("Invalid signature");
   }
 
   const payload = req.body;
-  const eventType = req.headers['x-github-event'];
+  const jobId = payload.commit_sha;
 
-  // Logic to determine the project name from the GitHub payload
-  const projectName = payload.project_name || (payload.repository ? payload.repository.full_name : "Manual Trigger");
+  console.log('\n========================================');
+  console.log(`NEW PIPELINE JOB: ${jobId}`);
+  console.log('========================================');
 
   try {
-    const envelope = JSON.stringify({
-      id: uuidv4(),
-      timestamp: new Date().toISOString(),
-      type: eventType,
-      source: "github_webhook",
-      payload: {
-          ...payload,
-          project_name: projectName // Ensure the worker finds this key easily
-      }
-    });
-    console.log(envelope)
-    // Push the structured envelope to Redis
-    await redisConnection.lPush(queue_name, envelope);
-    console.log(`Queued: ${projectName}`);
+    // 1. Extract the list of added or modified files sent by the Action
+    const rawFiles = [
+      ...(payload.files?.added || []),
+      ...(payload.files?.modified || [])
+    ];
 
-    res.status(202).json({ message: "Accepted", project: projectName });
-  } catch(err) {
-    console.error('Redis Push Error:', err);
+    // 2. Filter based on supported extensions
+    const validFiles = rawFiles.filter(isSupportedFile);
+    const numFiles = validFiles.length;
+
+    console.log(`Total files in commit: ${rawFiles.length} | Supported files to process: ${numFiles}`);
+
+    if (numFiles === 0) {
+      console.log("No supported files to process.");
+      return res.status(200).send("No processable files.");
+    }
+
+    // 3. Set state counters in Redis to let the AI Agent know when the job is finished
+    await redisConnection.set(`job:${jobId}:pending`, numFiles);
+    await redisConnection.set(`job:${jobId}:metadata`, JSON.stringify({
+      project: payload.project_name,
+      author: payload.author,
+      message: payload.commit_message,
+      dev_phase: payload.development_phase,
+      security_scan: payload.security_scan_results
+    }));
+
+    // 4. For each valid file: Fetch -> Upload to MinIO -> Queue in Redis
+    for (const originalPath of validFiles) {
+      console.log(`[Job ${jobId}] Transferring to MinIO: ${originalPath}...`);
+      
+      const objectKey = `commits/${jobId}/${originalPath}`;
+      
+      // Upload to S3/MinIO
+      await processAndUploadFile(payload.project_name, jobId, originalPath, objectKey);
+
+      // Create the "Lightweight" task ticket for the AI Agent
+      const ticket = {
+        task_id: uuidv4(),
+        job_id: jobId,
+        type: "parse_file",
+        original_github_path: originalPath,
+        s3_uri: `s3://${BUCKET_NAME}/${objectKey}` 
+      };
+
+      await redisConnection.lPush('queue:ai_tasks', JSON.stringify(ticket));
+    }
+
+    console.log(`[Job ${jobId}] Queuing completed successfully.`);
+    res.status(202).send("Accepted and queued successfully");
+
+  } catch (err) {
+    console.error('Error processing webhook:', err);
     res.status(500).send('Internal Server Error');
   }
 });
 
-
-// Receive decisions from WS2 and update GitHub Commit Status
+// --- GITHUB STATUS ENDPOINT (Intact) ---
 app.post('/update-github-status', async (req, res) => {
   const { owner, repo, sha, state, description } = req.body;
-  
-  // Using the specific variable name you requested
   const token = process.env.WEBHOOK_REPO_TOKEN;
 
   if (!token) {
@@ -97,7 +185,6 @@ app.post('/update-github-status', async (req, res) => {
   }
 
   try {
-    // GitHub Commit Status REST API URL
     const githubUrl = `https://api.github.com/repos/${owner}/${repo}/statuses/${sha}`;
     
     const response = await fetch(githubUrl, {
@@ -109,7 +196,7 @@ app.post('/update-github-status', async (req, res) => {
         'X-GitHub-Api-Version': '2022-11-28'
       },
       body: JSON.stringify({
-        state: state, // GitHub expects: 'success', 'failure', 'pending', or 'error'
+        state: state,
         description: description,
         context: 'Hitachi AI Advisor'
       })
@@ -130,5 +217,5 @@ app.post('/update-github-status', async (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Listening on port ${port}`)
+  console.log(`Webhook Manager listening on port ${port}`);
 });
