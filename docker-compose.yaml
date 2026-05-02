@@ -5,13 +5,14 @@ services:
     container_name: advisor_db
     restart: always
     environment:
-      POSTGRES_USER: ai_user
-      POSTGRES_PASSWORD: super_password
-      POSTGRES_DB: release_pipeline_db
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.db
     networks:
       - advisor_net
 
@@ -20,9 +21,21 @@ services:
     image: redis:7-alpine
     container_name: advisor_redis
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT}:6379"
     networks:
       - advisor_net
+
+  # --- LOCAL STORAGE MANAGER (MinIO)
+  # docker-compose.yml
+  minio:
+    image: minio/minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    command: server /data --console-address ":9001"
 
   # --- WEBHOOK MANAGER ---
   webhook-manager:
@@ -34,12 +47,65 @@ services:
     depends_on:
       - redis_broker
     environment:
-      - REDIS_URL=redis://redis_broker:6379
+      - REDIS_URL=redis://${REDIS_HOST}:6379
+      - REDIS_QUEUE_NAME=${REDIS_QUEUE}
       - PORT=3000
       - WEBHOOK_REPO_TOKEN=${WEBHOOK_REPO_TOKEN}
     networks:
       - advisor_net
 
+  # --- AI AGENT (MOCK) ---
+  agent:
+    build: ./agent
+    container_name: agent
+    restart: on-failure
+    depends_on:
+      - redis_broker
+      - postgres_db
+    environment:
+      - REDIS_URL=redis://${REDIS_HOST}:6379
+      - REDIS_QUEUE_NAME=${REDIS_QUEUE}
+      - REDIS_CHANNEL_NAME=${REDIS_CHANNEL}
+      # connection string: postgresql://USER:PASSWORD@HOSTNAME:PORT/DB_NAME
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@postgres_db:5432/${DB_NAME}
+      - PYTHONUNBUFFERED=1
+    networks:
+      - advisor_net
+
+  # --- BACKEND CLIENT ---
+  backend-client:
+    build: ./backend-client
+    container_name: backend_client
+    restart: on-failure
+    ports:
+      - "3001:3001" # Port for React to talk to
+    depends_on:
+      - redis_broker
+      - postgres_db
+    environment:
+      - REDIS_URL=redis://${REDIS_HOST}:6379
+      - REDIS_CHANNEL_NAME=${REDIS_CHANNEL}
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@postgres_db:5432/${DB_NAME}
+      - PORT=3001
+    networks:
+      - advisor_net
+      
+# --- FRONTEND CLIENT ---
+  frontend-client:
+    build: 
+      context: ./frontend-client
+      args:
+        - VITE_API_URL=http://localhost:3001
+        - VITE_USE_MOCK_DATA=false
+    container_name: frontend_client
+    restart: on-failure
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend-client
+    networks:
+      - advisor_net
+    
 volumes:
   postgres_data:
 
