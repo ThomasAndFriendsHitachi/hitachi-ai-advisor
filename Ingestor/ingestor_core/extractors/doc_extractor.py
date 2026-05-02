@@ -1,4 +1,5 @@
 import os
+import subprocess
 from pathlib import Path
 
 from .base_extractor import BaseExtractor, ExtractedData
@@ -10,6 +11,7 @@ from ..utils import TextUtils
 class DocExtractor(BaseExtractor):
     def extract(self, path: Path, options: IngestionOptions) -> ExtractedData:
         del options
+        
         if os.name == "nt":
             try:
                 import win32com.client  # type: ignore
@@ -65,21 +67,26 @@ class DocExtractor(BaseExtractor):
                 pass
 
         try:
-            import textract  # type: ignore
-
-            raw = textract.process(str(path))
-            text = TextUtils.normalize_whitespace(raw.decode("utf-8", errors="replace"))
+            result = subprocess.run(
+                ['antiword', str(path)], 
+                capture_output=True, 
+                text=True, 
+                check=True
+            )
+            
+            text = TextUtils.normalize_whitespace(result.stdout)
+            
             return (
                 "text",
                 text,
                 SectionParser.extract_sections_from_markdown_or_text(text) or None,
                 None,
                 {
-                    "extractor": "textract",
+                    "extractor": "antiword_subprocess",
                     "table_extraction": "not_supported",
                 },
             )
         except Exception as exc:
             raise RuntimeError(
-                "Could not extract .doc file. Install one of: pywin32 (Windows) or textract"
+                "Could not extract .doc file. Ensure 'antiword' is installed on Linux/Docker, or 'pywin32' on Windows."
             ) from exc

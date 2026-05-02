@@ -1,5 +1,4 @@
 import argparse
-import base64
 import json
 import os
 from dataclasses import dataclass
@@ -7,6 +6,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
+
+import boto3
 
 from .engine import IngestionEngine
 from .models import IngestionOptions
@@ -19,6 +21,9 @@ class WorkerConfig:
     processing_queue: str
     output_queue: str
     dlq_queue: str
+    minio_endpoint: str
+    minio_access_key: str
+    minio_secret_key: str
     pop_timeout_seconds: int = 5
     max_retries: int = 3
     recover_inflight_on_start: bool = True
@@ -35,16 +40,18 @@ class IngestionQueueWorker:
         self.engine = engine
         self.config = config
 
+        # Initialize S3 Client to download files from MinIO
+        self.s3 = boto3.client(
+            's3',
+            endpoint_url=self.config.minio_endpoint,
+            aws_access_key_id=self.config.minio_access_key,
+            aws_secret_access_key=self.config.minio_secret_key,
+            region_name='us-east-1' # Default for MinIO/S3 compatibility
+        )
+
     @staticmethod
     def _now_iso() -> str:
         return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
-
-    @staticmethod
-    def _extract_payload(envelope: Dict[str, Any]) -> Dict[str, Any]:
-        payload = envelope.get("payload")
-        if isinstance(payload, dict):
-            return payload
-        return envelope
 
     @staticmethod
     def _safe_relative_path(raw_path: str) -> Path:
@@ -53,84 +60,103 @@ class IngestionQueueWorker:
             raise ValueError(f"Invalid file path in job payload: {raw_path}")
         return rel
 
-    @classmethod
-    def _write_job_file(cls, root: Path, file_item: Dict[str, Any]) -> Path:
-        raw_path = str(file_item.get("path") or file_item.get("name") or "").strip()
-        if not raw_path:
-            raise ValueError("Each file entry must include 'path' or 'name'.")
+    def _build_final_envelope(self, job_id: str, ticket: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Assembles the final output payload once all files for a commit are ingested.
+        This ensures the output matches the exact schema defined in the Ingestor README.
+        """
+        # Fetch initial commit metadata saved by the webhook manager
+        metadata_raw = self.redis.get(f"job:{job_id}:metadata")
+        metadata = json.loads(metadata_raw) if metadata_raw else {}
 
-        relative_path = cls._safe_relative_path(raw_path)
-        target_path = (root / relative_path).resolve()
-        target_path.parent.mkdir(parents=True, exist_ok=True)
+        # Fetch all partially ingested files parked in Redis Hash
+        parsed_files_raw = self.redis.hgetall(f"job:{job_id}:parsed_files")
+        
+        all_files = []
+        for file_list_json in parsed_files_raw.values():
+            all_files.extend(json.loads(file_list_json))
 
-        if "content_base64" in file_item:
-            encoded = file_item.get("content_base64")
-            if not isinstance(encoded, str):
-                raise ValueError("'content_base64' must be a string.")
-            try:
-                data = base64.b64decode(encoded, validate=True)
-            except Exception as exc:
-                raise ValueError("Invalid base64 content in file payload.") from exc
-            target_path.write_bytes(data)
-            return target_path
+        # Recalculate summary metrics for the final payload
+        success_count = sum(1 for f in all_files if f.get("status") == "success")
+        error_count = sum(1 for f in all_files if f.get("status") == "error")
 
-        if "content" in file_item:
-            text = file_item.get("content")
-            if not isinstance(text, str):
-                raise ValueError("'content' must be a string.")
-            encoding = file_item.get("encoding", "utf-8")
-            if not isinstance(encoding, str) or not encoding:
-                raise ValueError("'encoding' must be a non-empty string when provided.")
-            target_path.write_text(text, encoding=encoding)
-            return target_path
-
-        raise ValueError("Each file entry must include 'content' or 'content_base64'.")
-
-    def _ingest_from_payload_files(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        files = payload.get("files")
-        if not isinstance(files, list) or not files:
-            raise ValueError("Job payload must include a non-empty 'files' list.")
-
-        with TemporaryDirectory(prefix="ingestor-job-") as temp_dir:
-            root = Path(temp_dir)
-            for file_item in files:
-                if not isinstance(file_item, dict):
-                    raise ValueError("Each item in 'files' must be an object.")
-                self._write_job_file(root, file_item)
-
-            return self.engine.ingest_path(root)
-
-    @classmethod
-    def _build_success_envelope(
-        cls,
-        input_envelope: Dict[str, Any],
-        payload: Dict[str, Any],
-        ingestion_payload: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        return {
-            "id": input_envelope.get("id"),
-            "source": input_envelope.get("source", "ingestor_worker"),
-            "type": "ingestion_result",
-            "timestamp": cls._now_iso(),
-            "status": "completed",
-            "project_name": payload.get("project_name"),
-            "summary": ingestion_payload.get("summary", {}),
-            "ingestion": ingestion_payload,
-            "attempt": int(input_envelope.get("_attempt", 0)),
+        ingestion_payload = {
+            "source": "github_webhook",
+            "generated_at": self._now_iso(),
+            "summary": {
+                "total_files": len(all_files),
+                "success_count": success_count,
+                "error_count": error_count
+            },
+            "files": all_files
         }
 
-    def process_reserved_message(self, raw_message: str) -> Dict[str, Any]:
+        # Clean up temporary state keys from Redis
+        self.redis.delete(f"job:{job_id}:pending")
+        self.redis.delete(f"job:{job_id}:metadata")
+        self.redis.delete(f"job:{job_id}:parsed_files")
+
+        return {
+            "id": job_id,
+            "source": ticket.get("source", "github_webhook"),
+            "type": "ingestion_result",
+            "timestamp": self._now_iso(),
+            "status": "completed",
+            "project_name": metadata.get("project", "Unknown"),
+            "summary": ingestion_payload["summary"],
+            "ingestion": ingestion_payload,
+            "attempt": int(ticket.get("_attempt", 0)),
+        }
+
+    def process_reserved_message(self, raw_message: str) -> Optional[Dict[str, Any]]:
+        """
+        Processes a single file from the queue.
+        Returns the final aggregated envelope ONLY if it's the last file for the job.
+        Otherwise, returns None to indicate partial completion.
+        """
         try:
-            envelope = json.loads(raw_message)
+            ticket = json.loads(raw_message)
         except json.JSONDecodeError as exc:
             raise ValueError("Queue message is not valid JSON.") from exc
 
-        if not isinstance(envelope, dict):
-            raise ValueError("Queue message must decode into a JSON object.")
+        job_id = ticket.get("job_id")
+        s3_uri = ticket.get("s3_uri")
+        original_path = ticket.get("original_github_path")
 
-        payload = self._extract_payload(envelope)
-        ingestion_payload = self._ingest_from_payload_files(payload)
-        return self._build_success_envelope(envelope, payload, ingestion_payload)
+        if not all([job_id, s3_uri, original_path]):
+            raise ValueError("Ticket is missing required fields (job_id, s3_uri, original_github_path).")
+
+        print(f"[*] Processing file: {original_path} (Job: {job_id})")
+
+        with TemporaryDirectory(prefix="ingestor-job-") as temp_dir:
+            root = Path(temp_dir)
+            
+            # Preserve original folder structure for the engine
+            target_path = (root / self._safe_relative_path(original_path)).resolve()
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # 1. Download file from MinIO
+            parsed_uri = urlparse(s3_uri)
+            bucket = parsed_uri.netloc
+            key = parsed_uri.path.lstrip('/')
+            self.s3.download_file(bucket, key, str(target_path))
+
+            # 2. Run your original Ingestion Engine on the downloaded file
+            ingestion_result = self.engine.ingest_path(root)
+
+        # 3. Save the ingested file data into Redis Hash
+        files_array = ingestion_result.get("files", [])
+        self.redis.hset(f"job:{job_id}:parsed_files", original_path, json.dumps(files_array))
+
+        # 4. Atomic Decrement: Check if this is the last file for the commit
+        pending_left = self.redis.decr(f"job:{job_id}:pending")
+        
+        if pending_left == 0:
+            print(f">>> [Job {job_id}] All files ingested! Generating final aggregated payload... <<<")
+            return self._build_final_envelope(job_id, ticket)
+            
+        print(f"[Job {job_id}] File processed. Waiting for {pending_left} more files...")
+        return None
 
     def _build_retry_or_dlq_message(self, raw_message: str, error: Exception) -> str:
         now_iso = self._now_iso()
@@ -178,7 +204,9 @@ class IngestionQueueWorker:
 
         try:
             output = self.process_reserved_message(reserved)
-            self.redis.lpush(self.config.output_queue, json.dumps(output, ensure_ascii=False))
+            # Push to output_queue ONLY if the entire job is finished (output is not None)
+            if output is not None:
+                self.redis.lpush(self.config.output_queue, json.dumps(output, ensure_ascii=False))
         except Exception as exc:
             self._handle_failure(reserved, exc)
         finally:
@@ -218,6 +246,9 @@ def build_config_from_env() -> WorkerConfig:
         processing_queue=os.environ.get("INGESTOR_PROCESSING_QUEUE", f"{input_queue}:processing"),
         output_queue=os.environ.get("INGESTOR_OUTPUT_QUEUE", "queue:ingestor_results"),
         dlq_queue=os.environ.get("INGESTOR_DLQ_QUEUE", "queue:ingestor_dlq"),
+        minio_endpoint=os.environ.get("MINIO_ENDPOINT", "http://minio:9000"),
+        minio_access_key=os.environ.get("MINIO_ROOT_USER", "admin"),
+        minio_secret_key=os.environ.get("MINIO_ROOT_PASSWORD", "SuperSecretMinio123!"),
         pop_timeout_seconds=int(os.environ.get("INGESTOR_POP_TIMEOUT", "5")),
         max_retries=int(os.environ.get("INGESTOR_MAX_RETRIES", "3")),
         recover_inflight_on_start=os.environ.get("INGESTOR_RECOVER_INFLIGHT", "true").lower() != "false",
@@ -226,7 +257,6 @@ def build_config_from_env() -> WorkerConfig:
 
 def create_redis_client(redis_url: str) -> Any:
     import redis
-
     return redis.from_url(redis_url, decode_responses=True)
 
 
@@ -240,5 +270,6 @@ def run_worker_from_env(argv: Optional[List[str]] = None) -> int:
         engine=IngestionEngine(options),
         config=config,
     )
+    print(f"[*] Ingestor Worker started. Listening on {config.input_queue}")
     worker.run_forever(max_jobs=args.max_jobs)
     return 0

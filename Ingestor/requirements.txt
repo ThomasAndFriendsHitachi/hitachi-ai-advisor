@@ -1,4 +1,5 @@
 # Core dependencies for multi-format ingestion
+boto3
 python-docx>=1.1.0
 pypdf>=4.2.0
 pdfplumber>=0.11.0
@@ -9,6 +10,3 @@ redis>=5.0.0
 
 # Legacy .doc extraction on Windows (uses Microsoft Word COM automation)
 pywin32>=306; platform_system == "Windows"
-
-# Legacy .doc fallback extractor for non-Windows environments
-textract>=1.6.5; platform_system != "Windows"
