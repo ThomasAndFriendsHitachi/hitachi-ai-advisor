@@ -19,3 +19,9 @@ This project orchestrates the various microservices that power the AI Advisor. I
 1. **Launch the services:**
    ```bash
    docker compose up --build
+
+1. **Open a tunnel using localhost.run**
+   ```bash
+   ssh -R 80:localhost:3000 localhost.run
+
+1. **You are now ready to receive webhooks on address_assigned_by_localhost.run/webhook**
