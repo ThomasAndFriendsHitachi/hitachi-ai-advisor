@@ -1,0 +1,35 @@
+version: "3.9"
+
+services:
+  pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hitachiai-pipeline
+    environment:
+      MODEL_PROFILES_FILE: models/model_profiles.json
+      PRIMARY_PROFILE: ${PRIMARY_PROFILE:-primary-hf-lmstudio}
+      SECONDARY_PROFILE: ${SECONDARY_PROFILE:-secondary-hf-lmstudio}
+      PRIMARY_LLM_BASE_URL: ${PRIMARY_LLM_BASE_URL:-http://host.docker.internal:1234/v1}
+      SECONDARY_LLM_BASE_URL: ${SECONDARY_LLM_BASE_URL:-http://host.docker.internal:1234/v1}
+      PRIMARY_LLM_API_KEY: ${PRIMARY_LLM_API_KEY:-local-key}
+      SECONDARY_LLM_API_KEY: ${SECONDARY_LLM_API_KEY:-local-key}
+      OLLAMA_HOST: ${OLLAMA_HOST:-http://host.docker.internal:11434}
+    volumes:
+      - ./inputs:/app/inputs
+      - ./outputs:/app/outputs
+      - ./models:/app/models
+      - ./templates:/app/templates
+    command:
+      - --project
+      - ssms
+      - --semver
+      - v0.1.0
+      - --model-profiles-file
+      - models/model_profiles.json
+      - --primary-profile
+      - ${PRIMARY_PROFILE:-primary-hf-lmstudio}
+      - --secondary-profile
+      - ${SECONDARY_PROFILE:-secondary-hf-lmstudio}
+    extra_hosts:
+      - host.docker.internal:host-gateway

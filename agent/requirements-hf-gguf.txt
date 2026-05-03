@@ -1,0 +1,4 @@
+-r requirements-hf-local.txt
+
+# Optional GGUF runtime backend
+llama-cpp-python>=0.3.0

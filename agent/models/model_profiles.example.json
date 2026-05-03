@@ -1,0 +1,49 @@
+{
+  "profiles": [
+    {
+      "name": "primary-hf-meta-llama31-8b",
+      "role": "primary",
+      "provider": "hf_local",
+      "model": "models/primary_llm/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
+      "base_url": null,
+      "api_key_env": null,
+      "model_dir": "models/primary_llm"
+    },
+    {
+      "name": "secondary-hf-mistral7b",
+      "role": "secondary",
+      "provider": "hf_local",
+      "model": "models/secondary_llm/Mistral-7B-Instruct-v0.3-Q4_K_M.gguf",
+      "base_url": null,
+      "api_key_env": null,
+      "model_dir": "models/secondary_llm"
+    },
+    {
+      "name": "primary-hf-lmstudio",
+      "role": "primary",
+      "provider": "openai_compatible",
+      "model": "meta-llama-3.1-8b-instruct",
+      "base_url": "http://localhost:1234/v1",
+      "api_key_env": null,
+      "model_dir": "models/primary_llm"
+    },
+    {
+      "name": "secondary-hf-lmstudio",
+      "role": "secondary",
+      "provider": "openai_compatible",
+      "model": "mistral-7b-instruct-v0.3",
+      "base_url": "http://localhost:1234/v1",
+      "api_key_env": null,
+      "model_dir": "models/secondary_llm"
+    },
+    {
+      "name": "embedding-hf-bge-m3",
+      "role": "embedding",
+      "provider": "hf_local",
+      "model": "BAAI/bge-m3",
+      "base_url": null,
+      "api_key_env": null,
+      "model_dir": "models/embedding_models/bge-m3"
+    }
+  ]
+}

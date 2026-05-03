@@ -1,0 +1,93 @@
+# ------------------------------
+# OS / Editor
+# ------------------------------
+.vscode/
+.idea/
+*.code-workspace
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ------------------------------
+# Python environments and caches
+# ------------------------------
+.venv/
+.venv*/
+venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.tox/
+.nox/
+.ipynb_checkpoints/
+.python-version
+
+# ------------------------------
+# Build / packaging artifacts
+# ------------------------------
+build/
+dist/
+.eggs/
+*.egg-info/
+pip-wheel-metadata/
+*.whl
+
+# ------------------------------
+# Logs and temp files
+# ------------------------------
+*.log
+*.tmp
+*.temp
+tmp/
+temp/
+
+# ------------------------------
+# Coverage
+# ------------------------------
+.coverage
+.coverage.*
+htmlcov/
+
+# ------------------------------
+# Local environment files / secrets
+# ------------------------------
+.env
+.env.*
+!.env.example
+
+# ------------------------------
+# Generated run outputs and inputs
+# ------------------------------
+outputs/
+inputs/
+
+
+# ------------------------------
+# Local model assets (large binaries)
+# ------------------------------
+models/primary_llm/**
+models/secondary_llm/**
+models/embedding_models/**
+models/model_profiles.json
+
+# Keep repo docs/examples under models tracked
+!models/README.md
+!models/docs/
+!models/docs/**
+!models/model_profiles.example.json
+!models/embedding_models/README.md
+
+# Safeguard: common model artifact extensions under models
+models/**/*.gguf
+models/**/*.safetensors
+models/**/*.onnx
+models/**/*.pt
+models/**/*.pth
+models/**/*.ckpt
+models/**/*.bin

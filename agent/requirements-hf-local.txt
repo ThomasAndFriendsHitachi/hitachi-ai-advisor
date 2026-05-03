@@ -1,0 +1,7 @@
+-r requirements.txt
+
+# Hugging Face local download support
+huggingface_hub>=0.23.0
+
+# This base file is intentionally lightweight and Python 3.12-friendly.
+# For GGUF runtime, install requirements-hf-gguf.txt.

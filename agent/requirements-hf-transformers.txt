@@ -1,0 +1,8 @@
+-r requirements-hf-local.txt
+
+# Optional Transformers backend for non-GGUF HF model folders
+transformers>=4.44.0
+torch>=2.3.0
+safetensors>=0.4.3
+sentencepiece>=0.2.0
+sentence-transformers>=3.0.1

@@ -1,0 +1,7 @@
+# Online providers (optional for API mode)
+openai>=1.30.0
+anthropic>=0.30.0
+
+# Local vector retrieval (optional; lexical fallback works without these)
+faiss-cpu>=1.8.0
+numpy>=1.26.0
